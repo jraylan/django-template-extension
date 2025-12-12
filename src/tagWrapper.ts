@@ -9,9 +9,53 @@ const hiddenCommentDecorationType = vscode.window.createTextEditorDecorationType
     letterSpacing: '-0.5em'
 });
 
+// Decoration type for highlighting Django tags inside strings (without /* */)
+const djangoTagInStringDecorationType = vscode.window.createTextEditorDecorationType({
+    backgroundColor: 'rgba(255, 200, 0, 0.15)',
+    borderRadius: '3px'
+});
+
+/**
+ * Check if a position is inside a string literal (single, double, or template)
+ */
+function isInsideString(content: string, position: number): boolean {
+    let inSingleQuote = false;
+    let inDoubleQuote = false;
+    let inTemplateString = false;
+    let i = 0;
+
+    while (i < position && i < content.length) {
+        const char = content[i];
+        const prevChar = i > 0 ? content[i - 1] : '';
+
+        // Skip escaped characters
+        if (prevChar === '\\') {
+            i++;
+            continue;
+        }
+
+        // Handle template strings
+        if (char === '`' && !inSingleQuote && !inDoubleQuote) {
+            inTemplateString = !inTemplateString;
+        }
+        // Handle single quotes (not in template or double)
+        else if (char === "'" && !inTemplateString && !inDoubleQuote) {
+            inSingleQuote = !inSingleQuote;
+        }
+        // Handle double quotes (not in template or single)
+        else if (char === '"' && !inTemplateString && !inSingleQuote) {
+            inDoubleQuote = !inDoubleQuote;
+        }
+
+        i++;
+    }
+
+    return inSingleQuote || inDoubleQuote || inTemplateString;
+}
+
 /**
  * Wraps Django template tags with block comments for TypeScript/JavaScript compatibility.
- * Only wraps tags that are not already wrapped.
+ * Only wraps tags that are not already wrapped and not inside strings.
  */
 export function wrapDjangoTags(content: string): string {
     // First, find all positions of already wrapped tags
@@ -40,9 +84,13 @@ export function wrapDjangoTags(content: string): string {
             }
         }
 
+        // Check if the tag is inside a string literal
+        const isInString = isInsideString(content, match.index);
+
         result += content.substring(lastIndex, match.index);
 
-        if (isWrapped) {
+        if (isWrapped || isInString) {
+            // Don't wrap if already wrapped or inside a string
             result += match[0];
         } else {
             result += `/* ${match[0]} */`;
@@ -108,11 +156,13 @@ export function hasWrappedDjangoTags(content: string): boolean {
 
 /**
  * Apply decorations to hide the \/* and *\/ around Django tags
+ * and highlight Django tags inside strings
 */
 export function applyHiddenCommentDecorations(editor: vscode.TextEditor): void {
     const document = editor.document;
     const content = document.getText();
-    const decorations: vscode.DecorationOptions[] = [];
+    const hiddenDecorations: vscode.DecorationOptions[] = [];
+    const stringTagDecorations: vscode.DecorationOptions[] = [];
 
     // Regex to find /* before Django tags and */ after them
     const wrapperRegex = /(\/\*)\s*(\{%[\s\S]*?%\}|\{\{[\s\S]*?\}\}|\{#[\s\S]*?#\})\s*(\*\/)/g;
@@ -127,11 +177,23 @@ export function applyHiddenCommentDecorations(editor: vscode.TextEditor): void {
         const closeStart = document.positionAt(match.index + match[0].length - match[3].length - 1); // -1 for space
         const closeEnd = document.positionAt(match.index + match[0].length);
 
-        decorations.push({ range: new vscode.Range(openStart, openEnd) });
-        decorations.push({ range: new vscode.Range(closeStart, closeEnd) });
+        hiddenDecorations.push({ range: new vscode.Range(openStart, openEnd) });
+        hiddenDecorations.push({ range: new vscode.Range(closeStart, closeEnd) });
     }
 
-    editor.setDecorations(hiddenCommentDecorationType, decorations);
+    // Find Django tags inside strings (not wrapped with /* */)
+    const tagRegex = new RegExp(DJANGO_TAG_REGEX.source, 'g');
+    while ((match = tagRegex.exec(content)) !== null) {
+        // Check if this tag is inside a string
+        if (isInsideString(content, match.index)) {
+            const start = document.positionAt(match.index);
+            const end = document.positionAt(match.index + match[0].length);
+            stringTagDecorations.push({ range: new vscode.Range(start, end) });
+        }
+    }
+
+    editor.setDecorations(hiddenCommentDecorationType, hiddenDecorations);
+    editor.setDecorations(djangoTagInStringDecorationType, stringTagDecorations);
 }
 
 /**
@@ -139,6 +201,7 @@ export function applyHiddenCommentDecorations(editor: vscode.TextEditor): void {
  */
 export function clearHiddenCommentDecorations(editor: vscode.TextEditor): void {
     editor.setDecorations(hiddenCommentDecorationType, []);
+    editor.setDecorations(djangoTagInStringDecorationType, []);
 }
 
 /**
