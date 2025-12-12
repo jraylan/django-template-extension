@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/jraylan/django-template-extension/compare/v1.0.2...v1.1.0) (2025-12-12)
+
+
+### Features
+
+* Added Logo and License files ([bda0894](https://github.com/jraylan/django-template-extension/commit/bda0894ca7c83e8c67a834d0469c4d8d302ccb2f))
+
 ## [1.0.2](https://github.com/jraylan/django-template-extension/compare/v1.0.1...v1.0.2) (2025-12-12)
 
 
