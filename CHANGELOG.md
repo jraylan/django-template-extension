@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/jraylan/django-template-extension/compare/v1.0.0...v1.0.1) (2025-12-12)
+
+
+### Bug Fixes
+
+* Update vscode version ([f7b13c9](https://github.com/jraylan/django-template-extension/commit/f7b13c9f22751165f8ff7579c0647b2717d94207))
+
 ## [1.0.0](https://github.com/jraylan/django-template-extension/commit/1fbc88316d1d3fa826dfcdf63d46bdb8710d0e3f) (2025-12-12)
 
 ### Added
