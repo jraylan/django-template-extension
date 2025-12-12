@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0](https://github.com/jraylan/django-template-extension/compare/v1.1.0...v1.2.0) (2025-12-12)
+
+
+### Features
+
+* highlight Django tags in strings without wrapping with /* */ ([05ad937](https://github.com/jraylan/django-template-extension/commit/05ad9377df88d63e2202d7fbbd5ef0b24d8036f9))
+
+
+### Bug Fixes
+
+* Fix error on extension start ([815bc0d](https://github.com/jraylan/django-template-extension/commit/815bc0d5764ea50202ee107b23f614e0c5058875))
+
 ## [1.1.0](https://github.com/jraylan/django-template-extension/compare/v1.0.2...v1.1.0) (2025-12-12)
 
 
