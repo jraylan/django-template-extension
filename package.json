@@ -24,7 +24,16 @@
     "jinja2",
     "template",
     "python",
-    "html"
+    "html",
+    "syntax highlighting",
+    "formatter",
+    "prettier",
+    "web development",
+    "flask",
+    "fastapi",
+    "django templates",
+    "jinja templates",
+    "html templates"
   ],
   "license": "MIT",
   "engines": {
