@@ -22,35 +22,91 @@ function isInsideString(content: string, position: number): boolean {
     let inSingleQuote = false;
     let inDoubleQuote = false;
     let inTemplateString = false;
-    let i = 0;
+    let templateExprDepth = 0; // Only meaningful when inTemplateString === true
 
-    while (i < position && i < content.length) {
+    let inLineComment = false;
+    let inBlockComment = false;
+
+    for (let i = 0; i < position && i < content.length; i++) {
         const char = content[i];
-        const prevChar = i > 0 ? content[i - 1] : '';
+        const nextChar = i + 1 < content.length ? content[i + 1] : '';
 
-        // Skip escaped characters
-        if (prevChar === '\\') {
-            i++;
+        // Handle comment bodies first
+        if (inLineComment) {
+            if (char === '\n') {
+                inLineComment = false;
+            }
             continue;
         }
 
-        // Handle template strings
-        if (char === '`' && !inSingleQuote && !inDoubleQuote) {
-            inTemplateString = !inTemplateString;
-        }
-        // Handle single quotes (not in template or double)
-        else if (char === "'" && !inTemplateString && !inDoubleQuote) {
-            inSingleQuote = !inSingleQuote;
-        }
-        // Handle double quotes (not in template or single)
-        else if (char === '"' && !inTemplateString && !inSingleQuote) {
-            inDoubleQuote = !inDoubleQuote;
+        if (inBlockComment) {
+            if (char === '*' && nextChar === '/') {
+                inBlockComment = false;
+                i++; // consume '/'
+            }
+            continue;
         }
 
-        i++;
+        // Start of comments (only when not inside a normal string; template is handled below)
+        if (!inSingleQuote && !inDoubleQuote && (!inTemplateString || templateExprDepth > 0)) {
+            if (char === '/' && nextChar === '/') {
+                inLineComment = true;
+                i++; // consume second '/'
+                continue;
+            }
+            if (char === '/' && nextChar === '*') {
+                inBlockComment = true;
+                i++; // consume '*'
+                continue;
+            }
+        }
+
+        // Escapes inside quotes (template text, single, double)
+        if (char === '\\' && (inSingleQuote || inDoubleQuote || (inTemplateString && templateExprDepth === 0))) {
+            i++; // skip escaped char
+            continue;
+        }
+
+        // Toggle template string (only when not inside single/double)
+        if (char === '`' && !inSingleQuote && !inDoubleQuote && templateExprDepth === 0) {
+            inTemplateString = !inTemplateString;
+            continue;
+        }
+
+        // If we're in template string TEXT (not inside ${...}), don't treat ' or " as string delimiters
+        if (inTemplateString && templateExprDepth === 0) {
+            if (char === '$' && nextChar === '{') {
+                templateExprDepth = 1;
+                i++; // consume '{'
+            }
+            continue;
+        }
+
+        // Inside ${...} expression of a template string: track nesting of braces when not in quotes
+        if (inTemplateString && templateExprDepth > 0 && !inSingleQuote && !inDoubleQuote) {
+            if (char === '{') {
+                templateExprDepth++;
+                continue;
+            }
+            if (char === '}') {
+                templateExprDepth--;
+                continue;
+            }
+        }
+
+        // Toggle single/double quotes (only when not inside the other quote type)
+        if (char === "'" && !inDoubleQuote) {
+            inSingleQuote = !inSingleQuote;
+            continue;
+        }
+
+        if (char === '"' && !inSingleQuote) {
+            inDoubleQuote = !inDoubleQuote;
+            continue;
+        }
     }
 
-    return inSingleQuote || inDoubleQuote || inTemplateString;
+    return inSingleQuote || inDoubleQuote || (inTemplateString && templateExprDepth === 0);
 }
 
 /**
@@ -227,7 +283,9 @@ export class DjangoTagWrapManager implements vscode.Disposable {
     }
 
     private setupListeners(): void {
-        // When a document is opened, wrap Django tags
+        // When a document is opened:
+        // - JS/TS: wrap Django tags
+        // - JSX/TSX: do NOT wrap (React syntax conflict); if wrappers exist, remove them
         this.disposables.push(
             vscode.workspace.onDidOpenTextDocument((document) => {
                 this.onDocumentOpen(document);
@@ -251,7 +309,7 @@ export class DjangoTagWrapManager implements vscode.Disposable {
         // Apply decorations when editor changes
         this.disposables.push(
             vscode.window.onDidChangeActiveTextEditor((editor) => {
-                if (editor && this.isTargetLanguage(editor.document.languageId)) {
+                if (editor && this.isDecorationTargetLanguage(editor.document.languageId)) {
                     this.updateDecorations(editor);
                 }
             })
@@ -261,7 +319,7 @@ export class DjangoTagWrapManager implements vscode.Disposable {
         this.disposables.push(
             vscode.workspace.onDidChangeTextDocument((event) => {
                 const editor = vscode.window.activeTextEditor;
-                if (editor && editor.document === event.document && this.isTargetLanguage(event.document.languageId)) {
+                if (editor && editor.document === event.document && this.isDecorationTargetLanguage(event.document.languageId)) {
                     this.updateDecorations(editor);
                 }
             })
@@ -273,7 +331,7 @@ export class DjangoTagWrapManager implements vscode.Disposable {
         }
 
         // Apply decorations to current editor
-        if (vscode.window.activeTextEditor && this.isTargetLanguage(vscode.window.activeTextEditor.document.languageId)) {
+        if (vscode.window.activeTextEditor && this.isDecorationTargetLanguage(vscode.window.activeTextEditor.document.languageId)) {
             this.updateDecorations(vscode.window.activeTextEditor);
         }
     }
@@ -286,69 +344,136 @@ export class DjangoTagWrapManager implements vscode.Disposable {
         applyHiddenCommentDecorations(editor);
     }
 
-    private isTargetLanguage(languageId: string): boolean {
+    /**
+     * Languages where we apply decorations (hide wrappers and highlight tags inside strings).
+     */
+    private isDecorationTargetLanguage(languageId: string): boolean {
         return languageId === 'typescript' ||
             languageId === 'javascript' ||
             languageId === 'typescriptreact' ||
             languageId === 'javascriptreact';
     }
 
+    /**
+     * True when the document is a .js/.ts file where wrapping is allowed.
+     * (A .js file can be in javascriptreact mode, então a decisão é por extensão.)
+     */
+    private isWrapAllowedForDocument(document: vscode.TextDocument): boolean {
+        if (!this.isDecorationTargetLanguage(document.languageId)) return false;
+
+        const fileName = (document.uri.scheme === 'file' ? document.uri.fsPath : document.fileName).toLowerCase();
+        return fileName.endsWith('.js') || fileName.endsWith('.ts');
+    }
+
+    /**
+     * True when the document is a .jsx/.tsx file where wrapping must be disabled.
+     */
+    private isWrapDisabledForDocument(document: vscode.TextDocument): boolean {
+        if (!this.isDecorationTargetLanguage(document.languageId)) return false;
+
+        const fileName = (document.uri.scheme === 'file' ? document.uri.fsPath : document.fileName).toLowerCase();
+        return fileName.endsWith('.jsx') || fileName.endsWith('.tsx');
+    }
+
     private async onDocumentOpen(document: vscode.TextDocument): Promise<void> {
         if (!this.enabled) return;
         if (this.isOpening || this.isSaving) return;
-        if (!this.isTargetLanguage(document.languageId)) return;
-
         const content = document.getText();
 
-        // Check if the document has unwrapped Django tags that need wrapping
-        if (!hasUnwrappedDjangoTags(content)) return;
+        // JSX/TSX (.jsx/.tsx): never wrap; if wrappers exist from a previous version, remove them
+        if (this.isWrapDisabledForDocument(document)) {
+            if (!hasWrappedDjangoTags(content)) return;
 
-        this.isOpening = true;
-        try {
-            const wrapped = wrapDjangoTags(content);
-            if (wrapped !== content) {
-                const edit = new vscode.WorkspaceEdit();
-                const fullRange = new vscode.Range(
-                    document.positionAt(0),
-                    document.positionAt(content.length)
-                );
-                edit.replace(document.uri, fullRange, wrapped);
-                await vscode.workspace.applyEdit(edit);
-                this.wrappedDocuments.add(document.uri.toString());
+            this.isOpening = true;
+            try {
+                const unwrapped = unwrapDjangoTags(content);
+                if (unwrapped !== content) {
+                    const edit = new vscode.WorkspaceEdit();
+                    const fullRange = new vscode.Range(
+                        document.positionAt(0),
+                        document.positionAt(content.length)
+                    );
+                    edit.replace(document.uri, fullRange, unwrapped);
+                    await vscode.workspace.applyEdit(edit);
+                    this.wrappedDocuments.delete(document.uri.toString());
+                }
+            } finally {
+                this.isOpening = false;
             }
-        } finally {
-            this.isOpening = false;
+            return;
+        }
+
+        // JS/TS: wrap unwrapped tags
+        if (this.isWrapAllowedForDocument(document)) {
+            if (!hasUnwrappedDjangoTags(content)) return;
+
+            this.isOpening = true;
+            try {
+                const wrapped = wrapDjangoTags(content);
+                if (wrapped !== content) {
+                    const edit = new vscode.WorkspaceEdit();
+                    const fullRange = new vscode.Range(
+                        document.positionAt(0),
+                        document.positionAt(content.length)
+                    );
+                    edit.replace(document.uri, fullRange, wrapped);
+                    await vscode.workspace.applyEdit(edit);
+                    this.wrappedDocuments.add(document.uri.toString());
+                }
+            } finally {
+                this.isOpening = false;
+            }
+            return;
         }
     }
 
     private onWillSave(event: vscode.TextDocumentWillSaveEvent): void {
         if (!this.enabled) return;
         const document = event.document;
-        if (!this.isTargetLanguage(document.languageId)) return;
-        if (!this.wrappedDocuments.has(document.uri.toString())) return;
-
-        this.isSaving = true;
-
-        // Create edit to unwrap Django tags before saving
         const content = document.getText();
-        const unwrapped = unwrapDjangoTags(content);
 
-        if (unwrapped !== content) {
-            const edit = new vscode.TextEdit(
-                new vscode.Range(
-                    document.positionAt(0),
-                    document.positionAt(content.length)
-                ),
-                unwrapped
-            );
-            event.waitUntil(Promise.resolve([edit]));
+        // JSX/TSX (.jsx/.tsx): never wrap; ensure wrappers are removed before saving
+        if (this.isWrapDisabledForDocument(document)) {
+            const unwrapped = unwrapDjangoTags(content);
+            if (unwrapped !== content) {
+                const edit = new vscode.TextEdit(
+                    new vscode.Range(
+                        document.positionAt(0),
+                        document.positionAt(content.length)
+                    ),
+                    unwrapped
+                );
+                event.waitUntil(Promise.resolve([edit]));
+                this.wrappedDocuments.delete(document.uri.toString());
+            }
+            return;
+        }
+
+        // JS/TS: unwrap only for documents we previously wrapped, then re-wrap after save
+        if (this.isWrapAllowedForDocument(document)) {
+            if (!this.wrappedDocuments.has(document.uri.toString())) return;
+
+            this.isSaving = true;
+
+            const unwrapped = unwrapDjangoTags(content);
+            if (unwrapped !== content) {
+                const edit = new vscode.TextEdit(
+                    new vscode.Range(
+                        document.positionAt(0),
+                        document.positionAt(content.length)
+                    ),
+                    unwrapped
+                );
+                event.waitUntil(Promise.resolve([edit]));
+            }
+            return;
         }
     }
 
     private async onDidSave(document: vscode.TextDocument): Promise<void> {
         if (!this.enabled) return;
         if (!this.isSaving) return;
-        if (!this.isTargetLanguage(document.languageId)) return;
+        if (!this.isWrapAllowedForDocument(document)) return;
 
         this.isSaving = false;
 
@@ -377,7 +502,7 @@ export class DjangoTagWrapManager implements vscode.Disposable {
         if (!editor) return;
 
         const document = editor.document;
-        if (!this.isTargetLanguage(document.languageId)) {
+        if (!this.isWrapAllowedForDocument(document)) {
             vscode.window.showWarningMessage('This command only works with TypeScript/JavaScript files');
             return;
         }
