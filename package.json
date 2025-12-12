@@ -5,6 +5,7 @@
   "main": "dist/extension.js",
   "publisher": "jraylan",
   "author": "jraylan",
+  "icon": "resources/logo.png",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jraylan/django-template-extension.git"
