@@ -33,5 +33,5 @@
 
 ### Requirements
 
-- VS Code 1.70.0 or higher
+- VS Code 1.78.0 or higher
 - Node.js (for Prettier formatting)
