@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.2](https://github.com/jraylan/django-template-extension/compare/v1.0.1...v1.0.2) (2025-12-12)
+
+
+### Bug Fixes
+
+* Added .vscodeignore ([7489af5](https://github.com/jraylan/django-template-extension/commit/7489af5529be698ad855c11ca0a5dd89c4fa7ebf))
+* remove unused file ([d2e1c0c](https://github.com/jraylan/django-template-extension/commit/d2e1c0c275b1f2b3294482740f59f6e274f9d16b))
+* remove unused file (2) ([a983958](https://github.com/jraylan/django-template-extension/commit/a9839585390edeec487d6a560877a62ca4f829a2))
+* Update package home ([bfc15ff](https://github.com/jraylan/django-template-extension/commit/bfc15ff3e0b4de872026239324237389809f1834))
+
 ## [1.0.1](https://github.com/jraylan/django-template-extension/compare/v1.0.0...v1.0.1) (2025-12-12)
 
 

@@ -1,7 +1,7 @@
 {
   "name": "django-template-extension",
   "displayName": "Django/Jinja Template Support",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "main": "dist/extension.js",
   "publisher": "jraylan",
   "author": "jraylan",
