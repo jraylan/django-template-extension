@@ -12,11 +12,12 @@
   },
   "homepage": "https://github.com/jraylan/django-template-extension#readme",
   "scripts": {
-    "compile": "tsc -p ./",
-    "watch": "tsc -w -p ./",
-    "vscode:prepublish": "npm run compile",
+    "compile": "node esbuild.js",
+    "compile:tsc": "tsc -p ./",
+    "watch": "node esbuild.js --watch",
+    "vscode:prepublish": "npm run compile -- --production",
     "package": "vsce package",
-    "test": "npm run compile && node ./out/test/runTest.js"
+    "test": "npm run compile:tsc && node ./out/test/runTest.js"
   },
   "keywords": [
     "django",
@@ -50,7 +51,11 @@
     "onLanguage:typescript",
     "onLanguage:xml",
     "workspaceContains:**/templates/**",
-    "workspaceContains:**/template/**"
+    "workspaceContains:**/template/**",
+    "onCommand:djangoTemplateExtension.setAsDjangoHTML",
+    "onCommand:djangoTemplateExtension.wrapDjangoTags",
+    "onCommand:djangoTemplateExtension.unwrapDjangoTags",
+    "onCommand:djangoTemplateExtension.toggleTagWrapping"
   ],
   "contributes": {
     "languages": [
@@ -160,6 +165,7 @@
   "devDependencies": {
     "@types/node": "^20.4.2",
     "@types/vscode": "^1.78.0",
+    "esbuild": "^0.27.1",
     "release-please": "^17.1.3",
     "typescript": "^5.9.3"
   }

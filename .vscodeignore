@@ -2,29 +2,30 @@
 *
 
 # Include necessary files
-!dist/**
+!dist/extension.js
 !syntaxes/**
+!resources/**
 !language-configuration.json
 !package.json
 !README.md
 !README.pt-br.md
 !README.pt-pt.md
 !CHANGELOG.md
-!LICENSE
+!LICENSE.md
 
-# Exclude source maps
-dist/**/*.map
-
-# Exclude tests and dev files
+# Explicitly exclude
 src/
+node_modules/
+*.map
+esbuild.js
 tsconfig.json
 .github/
 .vscode/
 .git/
 .gitignore
-node_modules/
 *.vsix
 *.log
 .release-please-manifest.json
 release-please-config.json
 manage.py
+vsix-contents/

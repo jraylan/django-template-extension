@@ -14,6 +14,20 @@ export function activate(context: vscode.ExtensionContext) {
     tagWrapManager.setEnabled(wrapTagsConfig as boolean);
     context.subscriptions.push(tagWrapManager);
 
+    // Register command to set file as Django HTML
+    context.subscriptions.push(
+        vscode.commands.registerCommand(
+            'djangoTemplateExtension.setAsDjangoHTML',
+            async () => {
+                const editor = vscode.window.activeTextEditor;
+                if (editor) {
+                    await vscode.languages.setTextDocumentLanguage(editor.document, 'django-html');
+                    vscode.window.showInformationMessage('Language set to Django HTML');
+                }
+            }
+        )
+    );
+
     // Register commands for Django tag wrapping
     context.subscriptions.push(
         vscode.commands.registerCommand(
@@ -130,17 +144,6 @@ export function activate(context: vscode.ExtensionContext) {
     };
     context.subscriptions.push(
         vscode.languages.registerDocumentFormattingEditProvider(xmlSelectors, xmlProvider)
-    );
-
-    // Register command to manually set file as Django HTML
-    context.subscriptions.push(
-        vscode.commands.registerCommand('djangoTemplateExtension.setAsDjangoHTML', async () => {
-            const editor = vscode.window.activeTextEditor;
-            if (editor) {
-                await vscode.languages.setTextDocumentLanguage(editor.document, 'django-html');
-                vscode.window.showInformationMessage('File set as Django/Jinja HTML');
-            }
-        })
     );
 }
 
