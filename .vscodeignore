@@ -1,0 +1,30 @@
+# Exclude everything by default
+*
+
+# Include necessary files
+!dist/**
+!syntaxes/**
+!language-configuration.json
+!package.json
+!README.md
+!README.pt-br.md
+!README.pt-pt.md
+!CHANGELOG.md
+!LICENSE
+
+# Exclude source maps
+dist/**/*.map
+
+# Exclude tests and dev files
+src/
+tsconfig.json
+.github/
+.vscode/
+.git/
+.gitignore
+node_modules/
+*.vsix
+*.log
+.release-please-manifest.json
+release-please-config.json
+manage.py
