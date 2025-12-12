@@ -7,9 +7,9 @@
   "author": "jraylan",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jraylan/seamless-agent.git"
+    "url": "git+https://github.com/jraylan/django-template-extension.git"
   },
-  "homepage": "https://github.com/jraylan/seamless-agent#readme",
+  "homepage": "https://github.com/jraylan/django-template-extension#readme",
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -w -p ./",
