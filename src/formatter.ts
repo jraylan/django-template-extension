@@ -1,5 +1,22 @@
 import * as prettier from 'prettier';
 
+let cachedXmlPlugin: any | null = null;
+let didTryLoadXmlPlugin = false;
+
+function getXmlPlugin(): any | null {
+    if (didTryLoadXmlPlugin) return cachedXmlPlugin;
+    didTryLoadXmlPlugin = true;
+
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        cachedXmlPlugin = require('@prettier/plugin-xml');
+    } catch {
+        cachedXmlPlugin = null;
+    }
+
+    return cachedXmlPlugin;
+}
+
 /**
  * Format Django/Jinja HTML template content
  */
@@ -56,14 +73,7 @@ export async function formatDjangoXML(text: string): Promise<string> {
     const { masked, placeholders } = maskDjangoTags(text);
 
     try {
-        // Try to load XML plugin
-        let xmlPlugin;
-        try {
-            xmlPlugin = require('@prettier/plugin-xml');
-        } catch {
-            // Plugin not available
-            xmlPlugin = null;
-        }
+        const xmlPlugin = getXmlPlugin();
 
         const options: prettier.Options = {
             parser: 'xml',
@@ -87,7 +97,7 @@ interface Placeholder {
  * Also handles tags wrapped in \/* *\/ comments
 */
 function maskDjangoTags(text: string): { masked: string; placeholders: Placeholder[] } {
-    // First, handle wrapped tags: /* {{ ... }} */ or /* {% ... %} */ or /* {# ... #} */
+    // First, handle wrapped tags: {{ ... }} or {% ... %} or {# ... #}
     const wrappedRegex = /(\/\*\s*(?:{{[\s\S]*?}}|{%[\s\S]*?%}|{#[\s\S]*?#})\s*\*\/)/g;
     // Then handle unwrapped tags
     const unwrappedRegex = /({{[\s\S]*?}}|{%[\s\S]*?%}|{#[\s\S]*?#})/g;

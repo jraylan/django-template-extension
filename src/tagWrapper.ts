@@ -18,7 +18,11 @@ const djangoTagInStringDecorationType = vscode.window.createTextEditorDecoration
 /**
  * Check if a position is inside a string literal (single, double, or template)
  */
-function isInsideString(content: string, position: number): boolean {
+type StringContextChecker = (position: number) => boolean;
+
+function createStringContextChecker(content: string): StringContextChecker {
+    let idx = 0;
+
     let inSingleQuote = false;
     let inDoubleQuote = false;
     let inTemplateString = false;
@@ -27,86 +31,116 @@ function isInsideString(content: string, position: number): boolean {
     let inLineComment = false;
     let inBlockComment = false;
 
-    for (let i = 0; i < position && i < content.length; i++) {
-        const char = content[i];
-        const nextChar = i + 1 < content.length ? content[i + 1] : '';
+    const reset = () => {
+        idx = 0;
+        inSingleQuote = false;
+        inDoubleQuote = false;
+        inTemplateString = false;
+        templateExprDepth = 0;
+        inLineComment = false;
+        inBlockComment = false;
+    };
 
-        // Handle comment bodies first
-        if (inLineComment) {
-            if (char === '\n') {
-                inLineComment = false;
-            }
-            continue;
-        }
+    const advanceTo = (target: number) => {
+        while (idx < target && idx < content.length) {
+            const char = content[idx];
+            const nextChar = idx + 1 < content.length ? content[idx + 1] : '';
 
-        if (inBlockComment) {
-            if (char === '*' && nextChar === '/') {
-                inBlockComment = false;
-                i++; // consume '/'
-            }
-            continue;
-        }
-
-        // Start of comments (only when not inside a normal string; template is handled below)
-        if (!inSingleQuote && !inDoubleQuote && (!inTemplateString || templateExprDepth > 0)) {
-            if (char === '/' && nextChar === '/') {
-                inLineComment = true;
-                i++; // consume second '/'
+            // Handle comment bodies first
+            if (inLineComment) {
+                if (char === '\n') {
+                    inLineComment = false;
+                }
+                idx++;
                 continue;
             }
-            if (char === '/' && nextChar === '*') {
-                inBlockComment = true;
-                i++; // consume '*'
+
+            if (inBlockComment) {
+                if (char === '*' && nextChar === '/') {
+                    inBlockComment = false;
+                    idx += 2; // consume */
+                    continue;
+                }
+                idx++;
                 continue;
             }
-        }
 
-        // Escapes inside quotes (template text, single, double)
-        if (char === '\\' && (inSingleQuote || inDoubleQuote || (inTemplateString && templateExprDepth === 0))) {
-            i++; // skip escaped char
-            continue;
-        }
-
-        // Toggle template string (only when not inside single/double)
-        if (char === '`' && !inSingleQuote && !inDoubleQuote && templateExprDepth === 0) {
-            inTemplateString = !inTemplateString;
-            continue;
-        }
-
-        // If we're in template string TEXT (not inside ${...}), don't treat ' or " as string delimiters
-        if (inTemplateString && templateExprDepth === 0) {
-            if (char === '$' && nextChar === '{') {
-                templateExprDepth = 1;
-                i++; // consume '{'
+            // Start of comments (only when not inside a normal string; template TEXT is handled separately)
+            if (!inSingleQuote && !inDoubleQuote && (!inTemplateString || templateExprDepth > 0)) {
+                if (char === '/' && nextChar === '/') {
+                    inLineComment = true;
+                    idx += 2; // consume //
+                    continue;
+                }
+                if (char === '/' && nextChar === '*') {
+                    inBlockComment = true;
+                    idx += 2; // consume /*
+                    continue;
+                }
             }
-            continue;
-        }
 
-        // Inside ${...} expression of a template string: track nesting of braces when not in quotes
-        if (inTemplateString && templateExprDepth > 0 && !inSingleQuote && !inDoubleQuote) {
-            if (char === '{') {
-                templateExprDepth++;
+            // Escapes inside quotes (template TEXT, single, double)
+            if (char === '\\' && (inSingleQuote || inDoubleQuote || (inTemplateString && templateExprDepth === 0))) {
+                idx += 2; // skip escaped char
                 continue;
             }
-            if (char === '}') {
-                templateExprDepth--;
+
+            // Toggle template string (only when not inside single/double)
+            if (char === '`' && !inSingleQuote && !inDoubleQuote && templateExprDepth === 0) {
+                inTemplateString = !inTemplateString;
+                idx++;
                 continue;
             }
-        }
 
-        // Toggle single/double quotes (only when not inside the other quote type)
-        if (char === "'" && !inDoubleQuote) {
-            inSingleQuote = !inSingleQuote;
-            continue;
-        }
+            // Template string TEXT (not inside ${...}): treat everything as string content
+            if (inTemplateString && templateExprDepth === 0) {
+                if (char === '$' && nextChar === '{') {
+                    templateExprDepth = 1;
+                    idx += 2; // consume ${
+                    continue;
+                }
+                idx++;
+                continue;
+            }
 
-        if (char === '"' && !inSingleQuote) {
-            inDoubleQuote = !inDoubleQuote;
-            continue;
-        }
-    }
+            // Inside ${...} expression of a template string: track nesting of braces when not in quotes
+            if (inTemplateString && templateExprDepth > 0 && !inSingleQuote && !inDoubleQuote) {
+                if (char === '{') {
+                    templateExprDepth++;
+                    idx++;
+                    continue;
+                }
+                if (char === '}') {
+                    templateExprDepth--;
+                    idx++;
+                    continue;
+                }
+            }
 
-    return inSingleQuote || inDoubleQuote || (inTemplateString && templateExprDepth === 0);
+            // Toggle single/double quotes (only when not inside the other quote type)
+            if (char === "'" && !inDoubleQuote) {
+                inSingleQuote = !inSingleQuote;
+                idx++;
+                continue;
+            }
+
+            if (char === '"' && !inSingleQuote) {
+                inDoubleQuote = !inDoubleQuote;
+                idx++;
+                continue;
+            }
+
+            idx++;
+        }
+    };
+
+    return (position: number) => {
+        if (position < idx) {
+            reset();
+        }
+        advanceTo(position);
+        return inSingleQuote || inDoubleQuote || (inTemplateString && templateExprDepth === 0);
+    };
 }
 
 /**
@@ -130,6 +164,8 @@ export function wrapDjangoTags(content: string): string {
     let lastIndex = 0;
     let match;
 
+    const isInsideStringAt = createStringContextChecker(content);
+
     while ((match = tagCopy.exec(content)) !== null) {
         // Check if this tag is already wrapped (by checking if its position is in wrappedPositions)
         let isWrapped = false;
@@ -141,7 +177,7 @@ export function wrapDjangoTags(content: string): string {
         }
 
         // Check if the tag is inside a string literal
-        const isInString = isInsideString(content, match.index);
+        const isInString = isInsideStringAt(match.index);
 
         result += content.substring(lastIndex, match.index);
 
@@ -237,11 +273,13 @@ export function applyHiddenCommentDecorations(editor: vscode.TextEditor): void {
         hiddenDecorations.push({ range: new vscode.Range(closeStart, closeEnd) });
     }
 
+    const isInsideStringAt = createStringContextChecker(content);
+
     // Find Django tags inside strings (not wrapped with /* */)
     const tagRegex = new RegExp(DJANGO_TAG_REGEX.source, 'g');
     while ((match = tagRegex.exec(content)) !== null) {
         // Check if this tag is inside a string
-        if (isInsideString(content, match.index)) {
+        if (isInsideStringAt(match.index)) {
             const start = document.positionAt(match.index);
             const end = document.positionAt(match.index + match[0].length);
             stringTagDecorations.push({ range: new vscode.Range(start, end) });
@@ -269,6 +307,13 @@ export class DjangoTagWrapManager implements vscode.Disposable {
     private isSaving: boolean = false;
     private isOpening: boolean = false;
     private enabled: boolean = true;
+    private decorationDebounceHandle: ReturnType<typeof setTimeout> | undefined;
+    // Track documents recently closed to detect saves triggered by closing the last editor
+    private recentlyClosedDocs: Map<string, number> = new Map();
+    private closedDocTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+    // Tunable delay and TTL constants
+    private readonly RECHECK_DELAY_MS: number = 150;
+    private readonly CLOSE_DOC_TTL_MS: number = 2000;
 
     constructor() {
         this.setupListeners();
@@ -306,10 +351,33 @@ export class DjangoTagWrapManager implements vscode.Disposable {
             })
         );
 
+        // Cleanup when a document is fully closed
+        this.disposables.push(
+            vscode.workspace.onDidCloseTextDocument((document) => {
+                const uriStr = document.uri.toString();
+                // Record the close so onDidSave can detect it if save happens as part of closing
+                this.recentlyClosedDocs.set(uriStr, Date.now());
+                // Schedule cleanup of the record
+                if (this.closedDocTimers.has(uriStr)) {
+                    clearTimeout(this.closedDocTimers.get(uriStr));
+                }
+                const timer = setTimeout(() => {
+                    this.recentlyClosedDocs.delete(uriStr);
+                    this.closedDocTimers.delete(uriStr);
+                }, this.CLOSE_DOC_TTL_MS);
+                this.closedDocTimers.set(uriStr, timer);
+
+                // Remove from wrappedDocuments as the doc is being closed
+                this.wrappedDocuments.delete(uriStr);
+            })
+        );
+
         // Apply decorations when editor changes
         this.disposables.push(
             vscode.window.onDidChangeActiveTextEditor((editor) => {
                 if (editor && this.isDecorationTargetLanguage(editor.document.languageId)) {
+                    // On editor switch, apply immediately.
+                    this.clearDecorationDebounce();
                     this.updateDecorations(editor);
                 }
             })
@@ -320,7 +388,8 @@ export class DjangoTagWrapManager implements vscode.Disposable {
             vscode.workspace.onDidChangeTextDocument((event) => {
                 const editor = vscode.window.activeTextEditor;
                 if (editor && editor.document === event.document && this.isDecorationTargetLanguage(event.document.languageId)) {
-                    this.updateDecorations(editor);
+                    // Debounce decoration updates while typing.
+                    this.scheduleDecorationUpdate(editor);
                 }
             })
         );
@@ -334,6 +403,32 @@ export class DjangoTagWrapManager implements vscode.Disposable {
         if (vscode.window.activeTextEditor && this.isDecorationTargetLanguage(vscode.window.activeTextEditor.document.languageId)) {
             this.updateDecorations(vscode.window.activeTextEditor);
         }
+    }
+
+    private clearDecorationDebounce(): void {
+        if (this.decorationDebounceHandle) {
+            clearTimeout(this.decorationDebounceHandle);
+            this.decorationDebounceHandle = undefined;
+        }
+    }
+
+    private scheduleDecorationUpdate(editor: vscode.TextEditor): void {
+        const uri = editor.document.uri.toString();
+
+        if (this.decorationDebounceHandle) {
+            clearTimeout(this.decorationDebounceHandle);
+        }
+
+        this.decorationDebounceHandle = setTimeout(() => {
+            this.decorationDebounceHandle = undefined;
+
+            const active = vscode.window.activeTextEditor;
+            if (!active) return;
+            if (active.document.uri.toString() !== uri) return;
+            if (!this.isDecorationTargetLanguage(active.document.languageId)) return;
+
+            this.updateDecorations(active);
+        }, 150);
     }
 
     private updateDecorations(editor: vscode.TextEditor): void {
@@ -373,6 +468,25 @@ export class DjangoTagWrapManager implements vscode.Disposable {
 
         const fileName = (document.uri.scheme === 'file' ? document.uri.fsPath : document.fileName).toLowerCase();
         return fileName.endsWith('.jsx') || fileName.endsWith('.tsx');
+    }
+
+    private isDocumentOpenInAnyTab(uri: vscode.Uri): boolean {
+        const target = uri.toString();
+
+        for (const group of vscode.window.tabGroups.all) {
+            for (const tab of group.tabs) {
+                const input = tab.input;
+
+                if (input instanceof vscode.TabInputText) {
+                    if (input.uri.toString() === target) return true;
+                } else if (input instanceof vscode.TabInputTextDiff) {
+                    if (input.modified.toString() === target) return true;
+                    if (input.original.toString() === target) return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private async onDocumentOpen(document: vscode.TextDocument): Promise<void> {
@@ -475,13 +589,44 @@ export class DjangoTagWrapManager implements vscode.Disposable {
         if (!this.isSaving) return;
         if (!this.isWrapAllowedForDocument(document)) return;
 
+        // Clear saving flag (we're already in onDidSave)
         this.isSaving = false;
 
-        // Re-wrap Django tags after saving
+        const uriStr = document.uri.toString();
+
+        // Allow the close event to run first (race condition: onDidSave may fire before onDidCloseTextDocument)
+        await new Promise((resolve) => setTimeout(resolve, this.RECHECK_DELAY_MS));
+
+        // If the save happened as part of closing the last tab, avoid re-wrapping.
+        // Also treat the document as closed if it was recorded recently in recentlyClosedDocs.
+        if (this.recentlyClosedDocs.has(uriStr)) {
+            // cleanup timer if present
+            if (this.closedDocTimers.has(uriStr)) {
+                clearTimeout(this.closedDocTimers.get(uriStr));
+                this.closedDocTimers.delete(uriStr);
+            }
+            this.recentlyClosedDocs.delete(uriStr);
+            this.wrappedDocuments.delete(uriStr);
+            return;
+        }
+
+        // Re-check if document is open in any tab (may have been closed during delay)
+        if (!this.isDocumentOpenInAnyTab(document.uri)) {
+            this.wrappedDocuments.delete(uriStr);
+            return;
+        }
+
+        // Re-wrap Django tags after saving (only if not closed and still open in a tab)
         const content = document.getText();
         if (hasUnwrappedDjangoTags(content)) {
             const wrapped = wrapDjangoTags(content);
             if (wrapped !== content) {
+                // Double check again right before applying edit
+                if (this.recentlyClosedDocs.has(uriStr) || !this.isDocumentOpenInAnyTab(document.uri)) {
+                    this.wrappedDocuments.delete(uriStr);
+                    return;
+                }
+
                 const edit = new vscode.WorkspaceEdit();
                 const fullRange = new vscode.Range(
                     document.positionAt(0),
@@ -489,7 +634,7 @@ export class DjangoTagWrapManager implements vscode.Disposable {
                 );
                 edit.replace(document.uri, fullRange, wrapped);
                 await vscode.workspace.applyEdit(edit);
-                this.wrappedDocuments.add(document.uri.toString());
+                this.wrappedDocuments.add(uriStr);
             }
         }
     }
@@ -552,8 +697,15 @@ export class DjangoTagWrapManager implements vscode.Disposable {
     }
 
     public dispose(): void {
+        this.clearDecorationDebounce();
         for (const d of this.disposables) {
             d.dispose();
         }
+        // Clear any pending timers for recently closed documents
+        for (const t of this.closedDocTimers.values()) {
+            clearTimeout(t);
+        }
+        this.closedDocTimers.clear();
+        this.recentlyClosedDocs.clear();
     }
 }
