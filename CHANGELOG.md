@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.1](https://github.com/jraylan/django-template-extension/compare/v1.2.0...v1.2.1) (2025-12-13)
+
+
+### Bug Fixes
+
+* disable auto wrap in JSX/TSX ([36487c6](https://github.com/jraylan/django-template-extension/commit/36487c6acf23f3388b0db9c8ee4a86f00d57ee36))
+
+
+### Performance Improvements
+
+* speed up tag scanning and formatting ([e4a0cb0](https://github.com/jraylan/django-template-extension/commit/e4a0cb0caa8e583b7918338c9866d5f9dd393a07))
+
 ## [1.2.0](https://github.com/jraylan/django-template-extension/compare/v1.1.0...v1.2.0) (2025-12-12)
 
 
