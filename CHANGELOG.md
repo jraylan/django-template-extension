@@ -5,7 +5,7 @@
 
 ### Bug Fixes
 
-* prevent block tags from being re-flowed across lines [#11](https://github.com/jraylan/django-template-extension/issues/11) ([75f0784](https://github.com/jraylan/django-template-extension/commit/75f07840de67c0cfaf34925f5ad213a2ddbe5e02))
+* prevent block tags from being re-flowed across lines [#11](https://github.com/jraylan/django-template-extension/issues/11) ([1880338f](https://github.com/jraylan/django-template-extension/commit/1880338fb59c349c6cea9b7055758acdf1116ba9))
 
 ## [1.2.1](https://github.com/jraylan/django-template-extension/compare/v1.2.0...v1.2.1) (2025-12-13)
 
