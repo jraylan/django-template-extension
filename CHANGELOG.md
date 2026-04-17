@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/jraylan/django-template-extension/compare/v1.2.1...v1.2.2) (2026-04-17)
+
+
+### Bug Fixes
+
+* prevent block tags from being re-flowed across lines [#11](https://github.com/jraylan/django-template-extension/issues/11) ([75f0784](https://github.com/jraylan/django-template-extension/commit/75f07840de67c0cfaf34925f5ad213a2ddbe5e02))
+
 ## [1.2.1](https://github.com/jraylan/django-template-extension/compare/v1.2.0...v1.2.1) (2025-12-13)
 
 
