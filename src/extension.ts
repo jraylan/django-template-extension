@@ -70,7 +70,7 @@ export function activate(context: vscode.ExtensionContext) {
     const djangoHtmlProvider: vscode.DocumentFormattingEditProvider = {
         async provideDocumentFormattingEdits(document: vscode.TextDocument): Promise<vscode.TextEdit[]> {
             const fullText = document.getText();
-            const formatted = await formatDjangoTemplate(fullText);
+            const formatted = await formatDjangoTemplate(fullText, document.uri.fsPath);
             if (!formatted || formatted === fullText) {
                 return [];
             }
@@ -88,7 +88,7 @@ export function activate(context: vscode.ExtensionContext) {
         async provideDocumentFormattingEdits(document: vscode.TextDocument) {
             if (!await shouldFormat(document)) return [];
             const text = document.getText();
-            const formatted = await formatDjangoTemplate(text);
+            const formatted = await formatDjangoTemplate(text, document.uri.fsPath);
             if (!formatted || formatted === text) return [];
             const fullRange = new vscode.Range(document.positionAt(0), document.positionAt(text.length));
             return [vscode.TextEdit.replace(fullRange, formatted)];
@@ -104,7 +104,7 @@ export function activate(context: vscode.ExtensionContext) {
         async provideDocumentFormattingEdits(document: vscode.TextDocument) {
             if (!await shouldFormat(document)) return [];
             const text = document.getText();
-            const formatted = await formatDjangoJS(text);
+            const formatted = await formatDjangoJS(text, document.uri.fsPath);
             if (!formatted || formatted === text) return [];
             const fullRange = new vscode.Range(document.positionAt(0), document.positionAt(text.length));
             return [vscode.TextEdit.replace(fullRange, formatted)];
@@ -120,7 +120,7 @@ export function activate(context: vscode.ExtensionContext) {
         async provideDocumentFormattingEdits(document: vscode.TextDocument) {
             if (!await shouldFormat(document)) return [];
             const text = document.getText();
-            const formatted = await formatDjangoTS(text);
+            const formatted = await formatDjangoTS(text, document.uri.fsPath);
             if (!formatted || formatted === text) return [];
             const fullRange = new vscode.Range(document.positionAt(0), document.positionAt(text.length));
             return [vscode.TextEdit.replace(fullRange, formatted)];
@@ -136,7 +136,7 @@ export function activate(context: vscode.ExtensionContext) {
         async provideDocumentFormattingEdits(document: vscode.TextDocument) {
             if (!await shouldFormat(document)) return [];
             const text = document.getText();
-            const formatted = await formatDjangoXML(text);
+            const formatted = await formatDjangoXML(text, document.uri.fsPath);
             if (!formatted || formatted === text) return [];
             const fullRange = new vscode.Range(document.positionAt(0), document.positionAt(text.length));
             return [vscode.TextEdit.replace(fullRange, formatted)];
