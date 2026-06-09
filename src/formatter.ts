@@ -28,7 +28,7 @@ export async function formatDjangoTemplate(text: string): Promise<string> {
             htmlWhitespaceSensitivity: 'ignore'
         };
         const formatted = await prettier.format(masked, options);
-        return restoreDjangoTagsFromHTML(formatted, placeholders);
+        return applyDjangoBlockIndentation(restoreDjangoTagsFromHTML(formatted, placeholders));
     } catch (err) {
         console.error('formatDjangoTemplate failed:', err);
         return text;
@@ -94,6 +94,34 @@ interface Placeholder {
 }
 
 const HTML_TAG_RE = /({{[\s\S]*?}}|{%[\s\S]*?%}|{#[\s\S]*?#})/g;
+const DJANGO_BLOCK_INDENT = '  ';
+const DJANGO_OPENING_TAGS = new Set([
+    'autoescape',
+    'block',
+    'blocktrans',
+    'blocktranslate',
+    'comment',
+    'filter',
+    'for',
+    'if',
+    'spaceless',
+    'verbatim',
+    'with'
+]);
+const DJANGO_MIDDLE_TAGS = new Set(['elif', 'else', 'empty', 'plural']);
+const DJANGO_CLOSING_TAGS = new Set([
+    'endautoescape',
+    'endblock',
+    'endblocktrans',
+    'endblocktranslate',
+    'endcomment',
+    'endfilter',
+    'endfor',
+    'endif',
+    'endspaceless',
+    'endverbatim',
+    'endwith'
+]);
 
 /**
  * Mask Django/Jinja template tags for HTML formatting.
@@ -133,6 +161,55 @@ function restoreDjangoTagsFromHTML(text: string, placeholders: Placeholder[]): s
         restored = restored.split(token).join(p.original);
     }
     return restored;
+}
+
+function applyDjangoBlockIndentation(text: string): string {
+    let depth = 0;
+
+    return text
+        .split('\n')
+        .map(line => {
+            if (line.trim() === '') {
+                return line;
+            }
+
+            const tagType = getDjangoTagIndentationType(line.trim());
+            const effectiveDepth = tagType === 'close' || tagType === 'middle'
+                ? Math.max(depth - 1, 0)
+                : depth;
+
+            if (tagType === 'open' || tagType === 'middle') {
+                depth = effectiveDepth + 1;
+            } else if (tagType === 'close') {
+                depth = effectiveDepth;
+            }
+
+            return `${DJANGO_BLOCK_INDENT.repeat(effectiveDepth)}${line}`;
+        })
+        .join('\n');
+}
+
+function getDjangoTagIndentationType(line: string): 'open' | 'middle' | 'close' | null {
+    const match = line.match(/^\{%\s*([a-zA-Z_][\w]*)\b[\s\S]*?%\}$/);
+    if (!match) {
+        return null;
+    }
+
+    const tagName = match[1].toLowerCase();
+
+    if (DJANGO_MIDDLE_TAGS.has(tagName)) {
+        return 'middle';
+    }
+
+    if (DJANGO_CLOSING_TAGS.has(tagName)) {
+        return 'close';
+    }
+
+    if (DJANGO_OPENING_TAGS.has(tagName)) {
+        return 'open';
+    }
+
+    return null;
 }
 
 /**

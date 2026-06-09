@@ -91,6 +91,56 @@ describe('formatDjangoTemplate', () => {
         expect(soloTagLines(output).length).toBeGreaterThanOrEqual(soloTagLines(input).length);
     });
 
+    it('indents content inside block tags', async () => {
+        const input = dedent(`
+            {% block content %}
+            <div></div>
+            {% endblock %}
+        `);
+        const output = await formatDjangoTemplate(input);
+        expect(output.trim()).toBe(dedent(`
+            {% block content %}
+              <div></div>
+            {% endblock %}
+        `));
+    });
+
+    it('indents if/else branches inside Django control blocks', async () => {
+        const input = dedent(`
+            {% if user.is_authenticated %}
+            <p>Welcome, {{ user.name }}</p>
+            {% else %}
+            <p>Please log in</p>
+            {% endif %}
+        `);
+        const output = await formatDjangoTemplate(input);
+        expect(output.trim()).toBe(dedent(`
+            {% if user.is_authenticated %}
+              <p>Welcome, {{ user.name }}</p>
+            {% else %}
+              <p>Please log in</p>
+            {% endif %}
+        `));
+    });
+
+    it('indents for and empty branches inside loops', async () => {
+        const input = dedent(`
+            {% for item in items %}
+            <li>{{ item }}</li>
+            {% empty %}
+            <li>No items</li>
+            {% endfor %}
+        `);
+        const output = await formatDjangoTemplate(input);
+        expect(output.trim()).toBe(dedent(`
+            {% for item in items %}
+              <li>{{ item }}</li>
+            {% empty %}
+              <li>No items</li>
+            {% endfor %}
+        `));
+    });
+
     it('does not leak placeholder strings into output', async () => {
         const input = dedent(`
             {% block content %}
