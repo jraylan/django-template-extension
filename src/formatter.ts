@@ -17,16 +17,30 @@ function getXmlPlugin(): any | null {
     return cachedXmlPlugin;
 }
 
+async function getPrettierOptions(
+    filePath: string | undefined,
+    overrides: prettier.Options
+): Promise<prettier.Options> {
+    const resolvedConfig = filePath
+        ? await prettier.resolveConfig(filePath, { useCache: false })
+        : null;
+    return {
+        ...resolvedConfig,
+        ...overrides,
+        filepath: filePath
+    };
+}
+
 /**
  * Format Django/Jinja HTML template content
  */
-export async function formatDjangoTemplate(text: string): Promise<string> {
+export async function formatDjangoTemplate(text: string, filePath?: string): Promise<string> {
     try {
         const { masked, placeholders } = maskDjangoTagsForHTML(text);
-        const options: prettier.Options = {
+        const options = await getPrettierOptions(filePath, {
             parser: 'html',
             htmlWhitespaceSensitivity: 'ignore'
-        };
+        });
         const formatted = await prettier.format(masked, options);
         return applyDjangoBlockIndentation(restoreDjangoTagsFromHTML(formatted, placeholders));
     } catch (err) {
@@ -38,11 +52,11 @@ export async function formatDjangoTemplate(text: string): Promise<string> {
 /**
  * Format JavaScript content with Django template tags preserved
  */
-export async function formatDjangoJS(text: string): Promise<string> {
+export async function formatDjangoJS(text: string, filePath?: string): Promise<string> {
     const { masked, placeholders } = maskDjangoTags(text);
 
     try {
-        const options: prettier.Options = { parser: 'babel' };
+        const options = await getPrettierOptions(filePath, { parser: 'babel' });
         const formatted = await prettier.format(masked, options);
         return restoreDjangoTags(formatted, placeholders);
     } catch (err) {
@@ -54,11 +68,11 @@ export async function formatDjangoJS(text: string): Promise<string> {
 /**
  * Format TypeScript content with Django template tags preserved
  */
-export async function formatDjangoTS(text: string): Promise<string> {
+export async function formatDjangoTS(text: string, filePath?: string): Promise<string> {
     const { masked, placeholders } = maskDjangoTags(text);
 
     try {
-        const options: prettier.Options = { parser: 'typescript' };
+        const options = await getPrettierOptions(filePath, { parser: 'typescript' });
         const formatted = await prettier.format(masked, options);
         return restoreDjangoTags(formatted, placeholders);
     } catch (err) {
@@ -70,16 +84,16 @@ export async function formatDjangoTS(text: string): Promise<string> {
 /**
  * Format XML content with Django template tags preserved
  */
-export async function formatDjangoXML(text: string): Promise<string> {
+export async function formatDjangoXML(text: string, filePath?: string): Promise<string> {
     const { masked, placeholders } = maskDjangoTags(text);
 
     try {
         const xmlPlugin = getXmlPlugin();
 
-        const options: prettier.Options = {
+        const options = await getPrettierOptions(filePath, {
             parser: 'xml',
             plugins: xmlPlugin ? [xmlPlugin] : []
-        };
+        });
         const formatted = await prettier.format(masked, options);
         return restoreDjangoTags(formatted, placeholders);
     } catch (err) {

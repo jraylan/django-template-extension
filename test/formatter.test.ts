@@ -1,3 +1,6 @@
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { formatDjangoTemplate, formatDjangoJS, formatDjangoTS } from '../src/formatter';
 
@@ -161,6 +164,48 @@ describe('formatDjangoJS', () => {
         const output = await formatDjangoJS(input);
         expect(output).toContain("{% url 'home' %}");
         expect(output).toContain('{{ user.name }}');
+    });
+
+    it('applies project prettier config when a filepath is provided', async () => {
+        const tempDir = await mkdtemp(path.join(os.tmpdir(), 'django-template-extension'));
+        const filePath = path.join(tempDir, 'templates', 'example.js');
+
+        try {
+            await writeFile(path.join(tempDir, '.prettierrc'), JSON.stringify({
+                singleQuote: true,
+                semi: false
+            }));
+            await mkdir(path.dirname(filePath), { recursive: true });
+            await writeFile(filePath, '');
+
+            const output = await formatDjangoJS('const value = "hello";', filePath);
+
+            expect(output).toContain("const value = 'hello'");
+            expect(output).not.toContain(';');
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+        }
+    });
+
+    it('reloads prettier config after it changes on disk', async () => {
+        const tempDir = await mkdtemp(path.join(os.tmpdir(), 'django-template-extension'));
+        const filePath = path.join(tempDir, 'templates', 'example.js');
+        const configPath = path.join(tempDir, '.prettierrc');
+
+        try {
+            await mkdir(path.dirname(filePath), { recursive: true });
+            await writeFile(filePath, '');
+
+            await writeFile(configPath, JSON.stringify({ singleQuote: true }));
+            const firstOutput = await formatDjangoJS('const value = "hello"', filePath);
+            expect(firstOutput).toContain("const value = 'hello'");
+
+            await writeFile(configPath, JSON.stringify({}));
+            const secondOutput = await formatDjangoJS('const value = "hello"', filePath);
+            expect(secondOutput).toContain('const value = "hello"');
+        } finally {
+            await rm(tempDir, { recursive: true, force: true });
+        }
     });
 });
 
