@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/jraylan/django-template-extension/compare/v1.2.2...v1.3.0) (2026-06-09)
+
+
+### Features
+
+* read prettier config and apply Django block indentation ([0d00c37](https://github.com/jraylan/django-template-extension/commit/0d00c3779a0c00ba49905e4dcffb26a32bb39e7a))
+
 ## [1.2.2](https://github.com/jraylan/django-template-extension/compare/v1.2.1...v1.2.2) (2026-04-17)
 
 
